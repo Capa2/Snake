@@ -1,15 +1,15 @@
-int playRate, defaultPlayRate, frameRate, deathTime, sLength, sFill, xtraFood;
+int playRate, minPlayRate, frameRate, deathTime, sLength, sFill, foodCount;
 boolean die, start, eat, fast;
-int sMax = 50;
-int tile = 10;
+int sMax = 300;
+int tile = 20;
 Snake[] snakes = new Snake[sMax];
 Food[] foods = new Food[sMax]; 
 void setup()
 {
-  xtraFood = 0;
-  playRate = 10;
-  defaultPlayRate = playRate;
   frameRate = 100;
+  minPlayRate = 8;
+  playRate = minPlayRate;
+  foodCount = -1;
   deathTime = -1;
   sLength = 4;
   sFill = 250;
@@ -19,166 +19,161 @@ void setup()
   fast = false;
   size(840,720);
   frameRate(frameRate);
-  for(int i = 0; i < sLength; i++) {
+  for(int i = 0; i < sLength; ++i) {
     snakes[i] = new Snake(width/2, height/2-i*tile, i);
   }
-  foods[0] = new Food();
 }
 void draw()
 {
-  background(0);
+  if(deathTime != -1) background(round(1+frameCount-deathTime), 0 , 0);
+  else
+  {
+    background(0);
+    grid();
+  }
   for(int i = 0; i < sLength; i++)
   {
     snakes[i].update();
   }
-  foods[0].update();
-  if(sLength % 6 == 0 && eat)
-  {
-    ++xtraFood;
-    foods[xtraFood] = new Food();
+  if(foodCount == -1 || (sLength % 6 == 0 && eat))
+  { // Create 1 food and 1 every 6th sLength
+    ++foodCount;
+    foods[foodCount] = new Food();
     eat = false;
   }
-  for(int i = 0; i <= xtraFood; i++)
+  for(int i = 0; i <= foodCount; i++)
   {
     foods[i].update();
   }
 }
+void grid()
+{
+  int cols = round(width/tile);
+  int rows = round(height/tile);
+  stroke(40);
+  for(int i = 0; i < rows; ++i)
+  {
+    line(0, i*tile, width, i*tile);
+  }
+  for(int i = 0; i < cols; ++i)
+  {
+    line(i*tile, 0, i*tile, height);
+  }
+}
 class Food
 {
-  int xpos, ypos, r, g, b;
+  int xPos, yPos, r, g, b;
   Food()
   {
-    println("Food Spaaawned.");
     r = round(random(150,220));
     g = round(random(150,220));
     b = round(random(150,220));  
-    xpos = tile+round(random((width-tile*2)/tile))*tile;
-    ypos = tile+round(random((height-tile*2)/tile))*tile;
+    xPos = tile+round(random((width-tile*2)/tile))*tile;
+    yPos = tile+round(random((height-tile*2)/tile))*tile;
   }
   void update()
   {
-    if(snakes[0].x == xpos && snakes[0].y == ypos)
+    if(snakes[0].xPos == xPos && snakes[0].yPos == yPos)
     {
       eat = true;
-      println("Food Respawn.");
-      r = round(random(150,220));
-      g = round(random(150,220));
-      b = round(random(150,220));  
-      xpos = tile+round(random((width-tile*2)/tile))*tile;
-      ypos = tile+round(random((height-tile*2)/tile))*tile;
-      sLength++;
-      snakes[sLength-1] = new Snake(snakes[sLength-2].x, snakes[sLength-2].y, sLength-1);
+      r = round(random(125,255));
+      g = round(random(125,255));
+      b = round(random(125,255));  
+      xPos = tile*2+round(random((width-tile*4)/tile))*tile;
+      yPos = tile*2+round(random((height-tile*4)/tile))*tile;
+      if(sLength < sMax) {
+        sLength++;
+        snakes[sLength-1] = new Snake(snakes[sLength-2].xPos, snakes[sLength-2].yPos, sLength-1);
+      }
     }
     fill(r,g,b);
-    rect(xpos, ypos, tile, tile);
+    rect(xPos, yPos, tile, tile);
   }
 }
 class Snake
 {
-  int x, y, nx, ny, xs, ys, s, r, id;
-  int nx() {return nx;}
-  int ny() {return ny;}
-  Snake(int bx,int by,int i)
+  int xPos, yPos, xPrev, yPrev, xMove, yMove, id;
+  Snake(int x,int y,int i)
   {
-    rectMode(CENTER);
-    x = bx; y = by;
-    nx = x; ny = y;
-    xs = 0; ys = 0;
-    s = tile;
+    rectMode(CORNER);
+    xPos = x; yPos = y;
+    xMove = 0; yMove = 0;
     id = i;
-    
-    println(id + " Snake born.");
   }
   void update() 
   {
     if(isDead()) restart();
-    move();
+    else move();
     fill(sFill);
-    rect(x, y, tile, tile);
+    rect(xPos, yPos, tile, tile);
   }
   void move()
   {
-    if(!keyPressed) playRate = defaultPlayRate - xtraFood;
+    if(!keyPressed) playRate = minPlayRate + round(minPlayRate/(2+foodCount));
     if(keyPressed && id == 0)
-    {
-      start = true;
-      if(key == 'q')
+    { // The head of the snake is controlled with the WASD keys. Press Q to push it to the limit - Don't move backwards, just keep your head.
+      if((key == 'a' || key == 'd' || key == 's') && !start) start = true; // Start by moving in any direction but up.
+      if(key == 'q' && start) playRate = 2;
+      if(key == 'a' && xPos != snakes[1].xPos+tile)
       {
-        if(playRate == defaultPlayRate - xtraFood) playRate = 1;
-        else playRate = defaultPlayRate - xtraFood;
+        xMove = -tile;
+        yMove = 0;
       }
-      if(key == 'a' && x != snakes[1].x+tile)
+      if(key == 'w' && yPos != snakes[1].yPos+tile)
       {
-        xs = -s;
-        ys = 0;
+        xMove = 0;
+        yMove = -tile;
       }
-      else if(key == 'w' && y != snakes[1].y+tile)
+      if(key == 'd' && xPos != snakes[1].xPos-tile)
       {
-        xs = 0;
-        ys = -s;
+        xMove = tile;
+        yMove = 0;
       }
-      else if(key == 'd' && x != snakes[1].x-tile)
+      if(key == 's' && yPos != snakes[1].yPos-tile)
       {
-        xs = s;
-        ys = 0;
-      }
-      else if(key == 's' && y != snakes[1].y-tile)
-      {
-        xs = 0;
-        ys = s;
+        xMove = 0;
+        yMove = tile;
       }
     }
     if(id != 0)
-    {
-      xs = 0;
-      ys = 0;
-      if(snakes[id-1].nx() < x)
+    { // Other Snake object moves into the previous position of the snake object in front of it.
+      xMove = 0;
+      yMove = 0;
+      if(snakes[id-1].xPrev < xPos)
       {
-        //println(id + "left");
-        xs = -s;
-        ys = 0;
+        xMove = -tile;
       }
-      if(snakes[id-1].nx() > x)
+      else if(snakes[id-1].xPrev > xPos)
       {
-        //println(id + "right");
-        xs = s;
-        ys = 0;
+        xMove = tile;
       }
-      if(snakes[id-1].ny() < y)
+      else if(snakes[id-1].yPrev < yPos)
       {
-        //println(id + "up");
-        ys = -s;
-        xs = 0;
+        yMove = -tile;
       }
-      if(snakes[id-1].ny() > y)
+      else if(snakes[id-1].yPrev > yPos)
       {
-        //println(id + "down");
-        ys = s;
-        xs = 0;
-      }
-        
+        yMove = tile;
+      }   
     }
-    if(frameCount % playRate == 0 && start)
-    {
-      nx = x;
-      ny = y;
-      x += xs;
-      y += ys;
+    if(frameCount % playRate == 0 && start && !isDead())
+    { // All positions are updated at set rates.
+      xPrev = xPos;
+      yPrev = yPos;
+      xPos += xMove;
+      yPos += yMove;
     }
   }
   void restart()
   {
-    println("DEATH");
-    sFill = 0;
     if(deathTime == -1) deathTime = frameCount;
-    println(frameCount-deathTime);
-    if(frameCount > deathTime+frameRate/2) setup();
+    if(frameCount > deathTime+frameRate*1.5) setup();
   }
   boolean isDead()
   {
-   if(id != 0 && x-snakes[0].x == 0 && y-snakes[0].y == 0) return true;
-   else if(x < 0 || x > width || y < 0 || y > height) return true;
-   else if(deathTime != -1) return true;
-   else return false;
+   if(id != 0 && xPos-snakes[0].xPos == 0 && yPos-snakes[0].yPos == 0) return true; // Die if a snake object is in the same space as the snake head.
+   else if(xPos < 0 || xPos > width || yPos < 0 || yPos > height) return true; // Die if outside of the map.
+   else if(deathTime != -1) return true; // Or just die if a time of death exists. Can a time of death exist before death? The universe doesn't care.
+   else return false; // Otherwise continue... Though resistance is futile.
   }
 }
